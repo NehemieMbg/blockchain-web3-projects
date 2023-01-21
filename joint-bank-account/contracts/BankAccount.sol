@@ -61,6 +61,11 @@ contract BankAccount {
         _;
     }
 
+    modifier sufficientbalance(uint accountId, uint amount) {
+        require(accounts[accountId].balance >= amount, "insufficient balance");
+        _;
+    }
+
     // Enable an user to deposit eth to his balance
     function deposit(uint accountId) external payable accountOwner(accountId) {
         accounts[accountId].balance += msg.value;
@@ -89,7 +94,25 @@ contract BankAccount {
         emit AccountCreated(owners, id, block.timestamp);
     }
 
-    function requestWithdrawl(uint accountId, uint amount) external {}
+    function requestWithdrawl(
+        uint accountId,
+        uint amount
+    ) external accountOwner(accountId) sufficientbalance(accountId, amount) {
+        uint id = nextWithdrawId;
+        WithdrawRequest storage request = accounts[accountId].withdrewRequests[
+            id
+        ];
+        request.user = msg.sender;
+        request.amount = amount;
+        nextWithdrawId++;
+        emit WithdrawRequested(
+            msg.sender,
+            accountId,
+            id,
+            amount,
+            block.timestamp
+        );
+    }
 
     function ApproveWithdrawl(uint accountId, uint withdrawId) external {}
 
