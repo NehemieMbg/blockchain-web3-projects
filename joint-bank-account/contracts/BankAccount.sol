@@ -37,9 +37,57 @@ contract BankAccount {
     uint nextAccountId;
     uint nextWithdrawId;
 
-    function deposit(uint accountId) external payable {}
+    // Check if the user is the owner of this account (accountId)
+    modifier accountOwner(uint accountId) {
+        bool isOwner;
+        for (uint idx; idx < accounts[accountId].owners.length; idx++) {
+            if (accounts[accountId].owners[idx] == msg.sender) {
+                isOwner = true;
+                break;
+            }
+        }
+        require(isOwner, "you are not an owner of this account");
+        _;
+    }
 
-    function createAccount(address[] calldata otherOwners) external {}
+    // Check if an owner is valid to procide
+    modifier validOwners(address[] calldata owners) {
+        require(owners.length + 1 <= 4, "maximum of 4 owners per account");
+        for (uint i; i < owners.length; i++) {
+            for (uint j = i + 1; j < owners.length; j++) {
+                if (owners[j] == owners[i]) revert("No duplicate owners");
+            }
+        }
+        _;
+    }
+
+    // Enable an user to deposit eth to his balance
+    function deposit(uint accountId) external payable accountOwner(accountId) {
+        accounts[accountId].balance += msg.value;
+    }
+
+    // Enable an user to create an account
+    function createAccount(
+        address[] calldata otherOwners
+    ) external validOwners(otherOwners) {
+        address[] memory owners = new address[](otherOwners.length + 1);
+        owners[otherOwners.length] = msg.sender;
+
+        uint id = nextAccountId;
+
+        for (uint idx; idx < owners.length; idx++) {
+            if (idx < owners.length - 1) owners[idx] = otherOwners[idx];
+
+            if (userAccounts[owners[idx]].length > 2)
+                revert("each user can have a max of 3 accounts");
+
+            userAccounts[owners[idx]].push(id);
+        }
+
+        accounts[id].owners = owners;
+        nextAccountId++;
+        emit AccountCreated(owners, id, block.timestamp);
+    }
 
     function requestWithdrawl(uint accountId, uint amount) external {}
 
