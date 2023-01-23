@@ -28,7 +28,7 @@ contract BankAccount {
     struct Account {
         address[] owners;
         uint balance;
-        mapping(uint => WithdrawRequest) withdrewRequests;
+        mapping(uint => WithdrawRequest) withdrawRequests;
     }
 
     mapping(uint => Account) accounts;
@@ -66,7 +66,7 @@ contract BankAccount {
         _;
     }
 
-    modifier canApprove(uint accountId, uint withdrawId) {
+    modifier canApprove(uint256 accountId, uint256 withdrawId) {
         require(
             !accounts[accountId].withdrawRequests[withdrawId].approved,
             "this request is already approved"
@@ -76,11 +76,11 @@ contract BankAccount {
             "you cannot approve this request"
         );
         require(
-            accounts[accountId].withdrewRequests[withdrawId].user != address(0),
+            accounts[accountId].withdrawRequests[withdrawId].user != address(0),
             "this request does not exist"
         );
         require(
-            !accounts[accountId].withdrewRequests[withdrawId].ownersApproved[
+            !accounts[accountId].withdrawRequests[withdrawId].ownersApproved[
                 msg.sender
             ],
             "you have already approved this request"
@@ -133,7 +133,7 @@ contract BankAccount {
         uint amount
     ) external accountOwner(accountId) sufficientbalance(accountId, amount) {
         uint id = nextWithdrawId;
-        WithdrawRequest storage request = accounts[accountId].withdrewRequests[
+        WithdrawRequest storage request = accounts[accountId].withdrawRequests[
             id
         ];
         request.user = msg.sender;
@@ -152,7 +152,7 @@ contract BankAccount {
         uint accountId,
         uint withdrawId
     ) external accountOwner(accountId) canApprove(accountId, withdrawId) {
-        WithdrawRequest storage request = accounts[accountId].withdrewRequests[
+        WithdrawRequest storage request = accounts[accountId].withdrawRequests[
             withdrawId
         ];
         request.approvals++;
@@ -166,11 +166,11 @@ contract BankAccount {
         uint accountId,
         uint withdrawId
     ) external canWithdraw(accountId, withdrawId) {
-        uint amount = accounts[accountId].withdrewRequests[withdrawId].amount;
+        uint amount = accounts[accountId].withdrawRequests[withdrawId].amount;
         require(accounts[accountId].balance >= amount, "insufficient balance");
 
         accounts[accountId].balance -= amount;
-        delete accounts[accountId].withdrewRequests[withdrawId];
+        delete accounts[accountId].withdrawRequests[withdrawId];
 
         (bool sent, ) = payable(msg.sender).call{value: amount}("");
         require(sent, "transactoin failed");
@@ -188,7 +188,7 @@ contract BankAccount {
         uint accountId,
         uint withdrawId
     ) public view returns (uint) {
-        return accounts[accountId].withdrewRequests[withdrawId].approvals;
+        return accounts[accountId].withdrawRequests[withdrawId].approvals;
     }
 
     function getAccounts() public view returns (uint[] memory) {
