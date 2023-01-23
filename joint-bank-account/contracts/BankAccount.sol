@@ -14,7 +14,7 @@ contract BankAccount {
         uint amount,
         uint timestamp
     );
-    event Withdreaw(uint indexed withdraw, uint timestamp);
+    event Withdraw(uint indexed withdraw, uint timestamp);
     event AccountCreated(address[] owners, uint indexed id, uint timestamp);
 
     struct WithdrawRequest {
@@ -66,6 +66,40 @@ contract BankAccount {
         _;
     }
 
+    modifier canApprove(uint accountId, uint withdrawId) {
+        require(
+            !accounts[accountId].withdrawRequests[withdrawId].approved,
+            "this request is already approved"
+        );
+        require(
+            accounts[accountId].withdrawRequests[withdrawId].user != msg.sender,
+            "you cannot approve this request"
+        );
+        require(
+            accounts[accountId].withdrewRequests[withdrawId].user != address(0),
+            "this request does not exist"
+        );
+        require(
+            !accounts[accountId].withdrewRequests[withdrawId].ownersApproved[
+                msg.sender
+            ],
+            "you have already approved this request"
+        );
+        _;
+    }
+
+    modifier canWithdraw(uint accountId, uint withdrawId) {
+        require(
+            accounts[accountId].withdrawRequests[withdrawId].user == msg.sender,
+            "you did not create this request"
+        );
+        require(
+            accounts[accountId].withdrawRequests[withdrawId].approved,
+            "this request is not approved"
+        );
+        _;
+    }
+
     // Enable an user to deposit eth to his balance
     function deposit(uint accountId) external payable accountOwner(accountId) {
         accounts[accountId].balance += msg.value;
@@ -114,18 +148,50 @@ contract BankAccount {
         );
     }
 
-    function ApproveWithdrawl(uint accountId, uint withdrawId) external {}
+    function approveWithdrawl(
+        uint accountId,
+        uint withdrawId
+    ) external accountOwner(accountId) canApprove(accountId, withdrawId) {
+        WithdrawRequest storage request = accounts[accountId].withdrewRequests[
+            withdrawId
+        ];
+        request.approvals++;
+        request.ownersApproved[msg.sender] = true;
 
-    function withdraw(uint accountId, uint withdrawId) external {}
+        if (request.approvals == accounts[accountId].owners.length - 1)
+            request.approved = true;
+    }
 
-    function getBalance(uint accountId) public view returns (uint) {}
+    function withdraw(
+        uint accountId,
+        uint withdrawId
+    ) external canWithdraw(accountId, withdrawId) {
+        uint amount = accounts[accountId].withdrewRequests[withdrawId].amount;
+        require(accounts[accountId].balance >= amount, "insufficient balance");
+
+        accounts[accountId].balance -= amount;
+        delete accounts[accountId].withdrewRequests[withdrawId];
+
+        (bool sent, ) = payable(msg.sender).call{value: amount}("");
+        require(sent, "transactoin failed");
+
+        emit Withdraw(withdrawId, block.timestamp);
+    }
+
+    function getBalance(uint accountId) public view returns (uint) {
+        return accounts[accountId].balance;
+    }
 
     function getOwners(uint accountId) public view returns (address[] memory) {}
 
     function getApprovals(
         uint accountId,
         uint withdrawId
-    ) public view returns (uint) {}
+    ) public view returns (uint) {
+        return accounts[accountId].withdrewRequests[withdrawId].approvals;
+    }
 
-    function getAccounts() public view returns (uint[] memory) {}
+    function getAccounts() public view returns (uint[] memory) {
+        return userAccounts[msg.sender];
+    }
 }
