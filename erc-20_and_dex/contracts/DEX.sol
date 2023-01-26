@@ -19,5 +19,45 @@ contract Dex {
         _;
     }
 
-    function sell() external onlyOwner {}
+    function sell() external onlyOwner {
+        uint allowance = associatedToken.allowance(msg.sender, address(this));
+        require(
+            allowance > 0,
+            "you must allow this contract access to at least one token"
+        );
+        bool sent = associatedToken.transferFrom(
+            msg.sender,
+            address(this),
+            allowance
+        );
+        require(sent, "failed to send");
+    }
+
+    function withdrawTokens() external onlyOwner {
+        uint balance = associatedToken.balanceOf(address(this));
+        associatedToken.transfer(msg.sender, balance);
+    }
+
+    function withdrawFunds() external onlyOwner {
+        (bool sent, ) = payable(msg.sender).call{value: address(this).balance}(
+            ""
+        );
+        require(sent, "transaction failed");
+    }
+
+    function getPrice(uint numTokens) public view returns (uint) {
+        return numTokens * price;
+    }
+
+    function buy(uint numTokens) external payable {
+        require(numTokens <= getTokenBalance(), "not enuoght tokens");
+        uint priceForTokens = getPrice(numTokens);
+        require(msg.value == priceForTokens, "invalid value sent");
+
+        associatedToken.transfer(msg.sender, numTokens);
+    }
+
+    function getTokenBalance() public view returns (uint) {
+        return associatedToken.balanceOf(address(this));
+    }
 }
